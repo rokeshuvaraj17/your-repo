@@ -1,0 +1,61 @@
+// server.js
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const app = express();
+
+app.use(cors());
+app.use(bodyParser.json());
+
+// In-memory storage (replace with database in production)
+let deviceState = {
+  "esp32_001": {
+    power: false,
+    lastUpdated: new Date(),
+    temperature: 0,
+    humidity: 0
+  }
+};
+
+// API to get current state
+app.get('/api/command', (req, res) => {
+  const deviceId = req.query.deviceId;
+  res.json({ power: deviceState[deviceId].power });
+});
+
+// API to receive sensor data
+app.post('/api/data', (req, res) => {
+  const data = req.body;
+  deviceState[data.deviceId] = {
+    power: data.power,
+    temperature: data.temperature,
+    humidity: data.humidity,
+    lastUpdated: new Date()
+  };
+  res.sendStatus(200);
+});
+
+// API to change state (called by Flutter app)
+app.post('/api/control', (req, res) => {
+  const { deviceId, power } = req.body;
+  if (deviceState[deviceId]) {
+    deviceState[deviceId].power = power;
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: "Device not found" });
+  }
+});
+
+// API to get device data (called by Flutter app)
+app.get('/api/device/:id', (req, res) => {
+  const device = deviceState[req.params.id];
+  if (device) {
+    res.json(device);
+  } else {
+    res.status(404).json({ error: "Device not found" });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
